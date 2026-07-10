@@ -139,9 +139,17 @@ async function confirmIfNeeded(page) {
   let joined = false;
   while (Date.now() < deadline && !joined) {
     try {
-      await page.goto(GROUP_URL, { waitUntil: 'networkidle', timeout: 30000 });
-      // Give the Firestore realtime data a moment to render the cards.
-      await page.waitForTimeout(1500);
+      // NOTE: this app holds a permanent Firestore WebChannel connection, so the network
+      // never goes idle — 'networkidle' would always time out. Wait for DOM + real content.
+      await page.goto(GROUP_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      // Wait until the group's game data has actually rendered (capacity ratio like "32/32"
+      // or the day label appears), rather than waiting on network silence.
+      await page.waitForFunction(
+        () => /\d+\s*\/\s*\d+/.test(document.body.innerText) ||
+              /saturday|субот|актив/i.test(document.body.innerText),
+        { timeout: 20000 }
+      ).catch(() => {});
+      await page.waitForTimeout(1200);
 
       const hit = await findOpenTargetGame(page);
       if (hit) {
