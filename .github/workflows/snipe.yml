@@ -1,21 +1,20 @@
-name: Padel Saturday Sniper
+name: Padel Sniper (Monday 10-14 Lisbon)
 
-# WHY THE SCHEDULE LOOKS LIKE THIS ------------------------------------------
-# GitHub cron can't run more often than every 5 min and is often delayed further,
-# so we DON'T rely on cron frequency. Instead cron just STARTS the job a bit before
-# games are expected to open; snipe.mjs then polls every few seconds from inside the
-# job for up to MAX_RUNTIME_MS. Adjust the cron to your real open time after you've
-# watched the group once.
+# SCHEDULE ------------------------------------------------------------------
+# Games are dropped on MONDAY. We monitor continuously 10:00–14:00 Europe/Lisbon.
+# A single Actions job can run up to 6h, so ONE run covers the whole 4h window:
+# cron starts the job just before 10:00 Lisbon, then snipe.mjs polls every few
+# seconds internally until MAX_RUNTIME_MS (set to ~4h below) — the exact drop
+# moment is caught by that internal loop, not by cron.
 #
-# Observed pattern: next-weekend games seemed to appear Sunday ~12:30 Europe/Lisbon.
-# Lisbon is UTC+1 (summer) / UTC+0 (winter). The times below assume summer (WEST, UTC+1),
-# so 12:20 Lisbon = 11:20 UTC. We fire a few staggered starts to survive cron delay.
+# Times are UTC. Monday = day-of-week 1. Lisbon = UTC+1 in summer (WEST) /
+# UTC+0 in winter. Values below assume SUMMER: 10:00 Lisbon = 09:00 UTC.
+# In WINTER, shift these cron hours back by 1 (e.g. 08:55 -> 07:55).
 
 on:
   schedule:
-    # Sunday, staggered around the expected open time (UTC). Edit to taste.
-    - cron: '15 11 * * 0'   # 12:15 Lisbon (summer)
-    - cron: '25 11 * * 0'   # backup start in case the first was delayed/missed
+    - cron: '55 8 * * 1'    # start 08:55 UTC = 09:55 Lisbon (just before 10:00)
+    - cron: '30 9 * * 1'    # backup start 10:30 Lisbon, in case the first run was dropped
   workflow_dispatch: {}      # manual "Run workflow" button for testing
 
 concurrency:
@@ -25,7 +24,7 @@ concurrency:
 jobs:
   snipe:
     runs-on: ubuntu-latest
-    timeout-minutes: 55        # must exceed MAX_RUNTIME_MS below
+    timeout-minutes: 255       # must exceed MAX_RUNTIME_MS below (~4h05m of polling)
     steps:
       - uses: actions/checkout@v4
 
@@ -45,7 +44,7 @@ jobs:
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
           GROUP_URL:          'https://racket.id/groups/4Y4qCwClTWQPAM'
           POLL_INTERVAL_MS:   '6000'
-          MAX_RUNTIME_MS:     '2700000'   # 45 minutes of polling
+          MAX_RUNTIME_MS:     '14700000'  # ~4h05m — covers 10:00 to ~14:05 Lisbon
           HEADLESS:           'true'
         run: node snipe.mjs
 
