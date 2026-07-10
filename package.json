@@ -1,0 +1,15 @@
+{
+  "name": "racket-sniper",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Auto-join the Saturday game in the Padel PORTAL group on racket.id",
+  "scripts": {
+    "capture": "node capture-auth.mjs",
+    "snipe": "node snipe.mjs",
+    "snipe:local": "HEADLESS=false node snipe.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

@@ -1,0 +1,4 @@
+# NEVER commit your session — it is your login.
+storageState.json
+node_modules/
+*.png
