@@ -15,7 +15,20 @@ on:
   schedule:
     - cron: '55 8 * * 1'    # start 08:55 UTC = 09:55 Lisbon (just before 10:00)
     - cron: '30 9 * * 1'    # backup start 10:30 Lisbon, in case the first run was dropped
-  workflow_dispatch: {}      # manual "Run workflow" button for testing
+  workflow_dispatch:
+    inputs:
+      group_url:
+        description: 'Group URL to monitor (leave blank for the real PORTAL group)'
+        required: false
+        default: ''
+      max_runtime_ms:
+        description: 'How long to poll, in ms (e.g. 120000 = 2 min for a test)'
+        required: false
+        default: ''
+      target_day_re:
+        description: 'Day regex (blank = Saturday). e.g. "нд|sunday" to test Sunday'
+        required: false
+        default: ''
 
 concurrency:
   group: padel-sniper
@@ -42,9 +55,10 @@ jobs:
           STORAGE_STATE_B64:  ${{ secrets.STORAGE_STATE_B64 }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
-          GROUP_URL:          'https://racket.id/groups/4Y4qCwClTWQPAM'
+          GROUP_URL:          ${{ github.event.inputs.group_url      != '' && github.event.inputs.group_url      || 'https://racket.id/groups/4Y4qCwClTWQPAM' }}
           POLL_INTERVAL_MS:   '6000'
-          MAX_RUNTIME_MS:     '14700000'  # ~4h05m — covers 10:00 to ~14:05 Lisbon
+          MAX_RUNTIME_MS:     ${{ github.event.inputs.max_runtime_ms  != '' && github.event.inputs.max_runtime_ms  || '14700000' }}
+          TARGET_DAY_RE:      ${{ github.event.inputs.target_day_re   != '' && github.event.inputs.target_day_re   || 'saturday|субот|сб\s*\d' }}
           HEADLESS:           'true'
         run: node snipe.mjs
 

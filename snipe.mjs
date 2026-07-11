@@ -21,13 +21,20 @@ const HEADLESS         = process.env.HEADLESS !== 'false';
 const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const TG_CHAT  = process.env.TELEGRAM_CHAT_ID  || '';
 
-// Which day are we sniping. Default Saturday. Matches the game-card title text.
-// The group titles its games "Saturday, 14.00-16.00" etc, so we match on that.
-const TARGET_DAY_RE = new RegExp(process.env.TARGET_DAY_RE || 'saturday|субот|субб', 'i');
+// Which day are we sniping. Default Saturday. Cards may show the FULL word in the
+// title ("Saturday, 14.00-16.00") OR only the abbreviation in a date header ("Сб 18 Лип").
+// So we match: english "saturday", ukr/ru full "субот", and the abbreviation "Сб" when
+// followed by a day number ("Сб 18"). NOTE: no \b anchors — in JS \b is ASCII-only and
+// would never fire around Cyrillic letters, silently breaking every Cyrillic match.
+const TARGET_DAY_RE = new RegExp(process.env.TARGET_DAY_RE || 'saturday|субот|сб\\s*\\d', 'i');
 
 // Text that identifies a join control vs a leave/cancel control.
-const JOIN_RE  = /\b(join|приєдн|записа|реєстр|going|i'?m in|взяти участь)\b/i;
-const LEAVE_RE = /\b(leave|вийти|скасув|cancel|відписа|purchased|joined|ти в грі|you'?re in)\b/i;
+// (Again: NO \b — it would break the Cyrillic alternatives. "Приєднатися" -> matches "приєдн".)
+const JOIN_RE  = /(join|приєдн|запис|реєстр|going|i'?m in|взяти участь)/i;
+const LEAVE_RE = /(leave|вийти|скасув|cancel|відписа|purchased|joined|ти в грі|you'?re in)/i;
+// Payment-related controls the bot must NEVER click (this group takes 25€ prepayment
+// and the site has Stripe loaded). Guards the confirm step against auto-paying.
+const PAY_RE   = /(pay|оплат|checkout|stripe|card|картк|карту|€|\$|price|ціна)/i;
 
 // Capacity like "31/32" — join only if free < max.
 const CAP_RE = /(\d+)\s*\/\s*(\d+)/;
@@ -93,6 +100,7 @@ async function clickJoin(page) {
     try { t = (await el.innerText({ timeout: 500 })).trim(); } catch { continue; }
     if (!t || t.length > 40) continue;              // join buttons are short labels
     if (LEAVE_RE.test(t)) continue;                 // already joined / this is a leave button
+    if (PAY_RE.test(t)) continue;                   // never click a payment control
     if (JOIN_RE.test(t)) {
       log(`Clicking join control: "${t}"`);
       try {
@@ -105,8 +113,9 @@ async function clickJoin(page) {
 }
 
 // After clicking join there may be a confirmation modal ("Confirm", "Так", "OK", "Book").
+// It will NEVER click anything that looks like a payment control (PAY_RE).
 async function confirmIfNeeded(page) {
-  const CONFIRM_RE = /\b(confirm|підтверд|ok|так|yes|book|записа|join)\b/i;
+  const CONFIRM_RE = /(confirm|підтверд|приєдн|book now|готово|yes)/i;
   await page.waitForTimeout(800);
   const btns = page.locator('div, button, a');
   const n = await btns.count();
@@ -114,7 +123,7 @@ async function confirmIfNeeded(page) {
     const el = btns.nth(i);
     let t = '';
     try { t = (await el.innerText({ timeout: 300 })).trim(); } catch { continue; }
-    if (t && t.length <= 25 && CONFIRM_RE.test(t) && !LEAVE_RE.test(t)) {
+    if (t && t.length <= 25 && CONFIRM_RE.test(t) && !LEAVE_RE.test(t) && !PAY_RE.test(t)) {
       try { await el.click({ timeout: 2000 }); log(`Confirmed via "${t}"`); return true; } catch {}
     }
   }

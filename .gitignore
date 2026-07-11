@@ -2,3 +2,5 @@
 storageState.json
 node_modules/
 *.png
+.DS_Store
+.DS_Store
