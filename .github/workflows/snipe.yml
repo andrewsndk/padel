@@ -44,11 +44,33 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'          # cache & restore ~/.npm between runs (keyed on package-lock.json)
 
-      - name: Install deps + Chromium
+      # Cache the Playwright browser binaries (~114 MB Chromium) so we don't
+      # re-download them every run. Key on the Playwright version from package.json.
+      - name: Resolve Playwright version
+        id: pw
+        run: echo "v=$(node -p "require('./package.json').dependencies.playwright")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: pwcache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.v }}
+
+      - name: Install npm deps
+        run: npm ci || npm install
+
+      # On a cache hit, the Chromium binary is already present — only ensure the
+      # OS libraries are there (fast). On a miss, download the browser too.
+      - name: Install Chromium
         run: |
-          npm ci || npm install
-          npx playwright install --with-deps chromium
+          if [ "${{ steps.pwcache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
 
       - name: Run sniper
         env:
