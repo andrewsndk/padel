@@ -8,6 +8,7 @@
 
 import { chromium } from 'playwright';
 import readline from 'node:readline';
+import fs from 'node:fs';
 
 const ask = (q) => new Promise((res) => {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -22,7 +23,10 @@ const ask = (q) => new Promise((res) => {
   console.log('\n>>> Log into racket.id in the browser window that just opened.');
   console.log('>>> When you can see your account / groups, return here.\n');
   await ask('Press Enter once you are fully logged in... ');
-  await context.storageState({ path: 'storageState.json' });
+  // Firebase Auth may persist the refresh token in IndexedDB, not localStorage.
+  const state = await context.storageState({ indexedDB: true });
+  fs.writeFileSync('storageState.json', JSON.stringify(state), { mode: 0o600 });
+  fs.chmodSync('storageState.json', 0o600);
   console.log('\n✅ Saved storageState.json');
   console.log('   For GitHub Actions, turn it into a secret with:');
   console.log('     base64 -w0 storageState.json   (Linux)');

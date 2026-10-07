@@ -7,7 +7,8 @@
   "scripts": {
     "capture": "node capture-auth.mjs",
     "snipe": "node snipe.mjs",
-    "snipe:local": "HEADLESS=false node snipe.mjs"
+    "snipe:local": "HEADLESS=false node snipe.mjs",
+    "check": "MODE=check node snipe.mjs"
   },
   "dependencies": {
     "playwright": "^1.48.0"

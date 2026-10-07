@@ -1,34 +1,20 @@
-name: Padel Sniper (Monday 10-14 Lisbon)
-
-# SCHEDULE ------------------------------------------------------------------
-# Games are dropped on MONDAY. We monitor continuously 10:00–14:00 Europe/Lisbon.
-# A single Actions job can run up to 6h, so ONE run covers the whole 4h window:
-# cron starts the job just before 10:00 Lisbon, then snipe.mjs polls every few
-# seconds internally until MAX_RUNTIME_MS (set to ~4h below) — the exact drop
-# moment is caught by that internal loop, not by cron.
-#
-# Times are UTC. Monday = day-of-week 1. Lisbon = UTC+1 in summer (WEST) /
-# UTC+0 in winter. Values below assume SUMMER: 10:00 Lisbon = 09:00 UTC.
-# In WINTER, shift these cron hours back by 1 (e.g. 08:55 -> 07:55).
+name: Padel Saturday Sniper (Monday 10-13 Lisbon)
 
 on:
   schedule:
-    - cron: '55 8 * * 1'    # start 08:55 UTC = 09:55 Lisbon (just before 10:00)
-    - cron: '30 9 * * 1'    # backup start 10:30 Lisbon, in case the first run was dropped
+    # Start five minutes early so browser setup finishes before the 10:00 window.
+    - cron: '55 9 * * 1'
+      timezone: Europe/Lisbon
   workflow_dispatch:
     inputs:
-      group_url:
-        description: 'Group URL to monitor (leave blank for the real PORTAL group)'
-        required: false
-        default: ''
-      max_runtime_ms:
-        description: 'How long to poll, in ms (e.g. 120000 = 2 min for a test)'
-        required: false
-        default: ''
-      target_day_re:
-        description: 'Day regex (blank = Saturday). e.g. "нд|sunday" to test Sunday'
-        required: false
-        default: ''
+      mode:
+        description: 'Read-only check, or live monitoring (live only runs inside the Monday window)'
+        type: choice
+        required: true
+        default: check
+        options:
+          - check
+          - live
 
 concurrency:
   group: padel-sniper
@@ -37,60 +23,53 @@ concurrency:
 jobs:
   snipe:
     runs-on: ubuntu-latest
-    timeout-minutes: 255       # must exceed MAX_RUNTIME_MS below (~4h05m of polling)
+    timeout-minutes: 205
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'          # cache & restore ~/.npm between runs (keyed on package-lock.json)
+          cache: npm
 
-      # Cache the Playwright browser binaries (~114 MB Chromium) so we don't
-      # re-download them every run. Key on the Playwright version from package.json.
       - name: Resolve Playwright version
         id: pw
-        run: echo "v=$(node -p "require('./package.json').dependencies.playwright")" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(node -p \"require('./package-lock.json').packages['node_modules/playwright'].version\")" >> "$GITHUB_OUTPUT"
 
-      - name: Cache Playwright browsers
+      - name: Cache Playwright browser
         id: pwcache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.v }}
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
 
-      - name: Install npm deps
-        run: npm ci || npm install
+      - name: Install dependencies
+        run: npm ci
 
-      # On a cache hit, the Chromium binary is already present — only ensure the
-      # OS libraries are there (fast). On a miss, download the browser too.
       - name: Install Chromium
-        run: |
-          if [ "${{ steps.pwcache.outputs.cache-hit }}" = "true" ]; then
-            npx playwright install-deps chromium
-          else
-            npx playwright install --with-deps chromium
-          fi
+        run: npx playwright install --with-deps chromium
 
       - name: Run sniper
         env:
-          STORAGE_STATE_B64:  ${{ secrets.STORAGE_STATE_B64 }}
+          MODE: ${{ github.event_name == 'schedule' && 'live' || inputs.mode || 'check' }}
+          STORAGE_STATE_B64: ${{ secrets.STORAGE_STATE_B64 }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
-          GROUP_URL:          ${{ github.event.inputs.group_url      != '' && github.event.inputs.group_url      || 'https://racket.id/groups/4Y4qCwClTWQPAM' }}
-          POLL_INTERVAL_MS:   '6000'
-          MAX_RUNTIME_MS:     ${{ github.event.inputs.max_runtime_ms  != '' && github.event.inputs.max_runtime_ms  || '14700000' }}
-          TARGET_DAY_RE:      ${{ github.event.inputs.target_day_re   != '' && github.event.inputs.target_day_re   || 'saturday|субот|сб\s*\d' }}
-          HEADLESS:           'true'
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GROUP_URL: https://racket.id/groups/4Y4qCwClTWQPAM
+          POLL_INTERVAL_MS: '1000'
+          RELOAD_INTERVAL_MS: '15000'
+          MAX_RUNTIME_MS: '11700000'
+          HEADLESS: 'true'
         run: node snipe.mjs
 
-      - name: Upload screenshots (for debugging)
+      - name: Upload diagnostic screenshots and result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sniper-screenshots
+          name: sniper-diagnostics
           path: |
             joined.png
-            no-join-button.png
+            unverified.png
+            result.json
           if-no-files-found: ignore
           retention-days: 7
