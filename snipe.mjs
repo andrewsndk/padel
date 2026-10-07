@@ -10,7 +10,7 @@ if (!['live', 'check'].includes(MODE)) throw new Error('MODE must be live or che
 const GROUP_URL = process.env.GROUP_URL || 'https://racket.id/groups/4Y4qCwClTWQPAM';
 const STORAGE = process.env.STORAGE_STATE || 'storageState.json';
 const POLL_MS = positiveNumber(process.env.POLL_INTERVAL_MS, 1000, 200);
-const RELOAD_MS = positiveNumber(process.env.RELOAD_INTERVAL_MS, 15000, 5000);
+const RELOAD_MS = positiveNumber(process.env.RELOAD_INTERVAL_MS, 5000, 1000);
 const MAX_MS = positiveNumber(process.env.MAX_RUNTIME_MS, 5 * 3600000);
 const pending = new Set();
 function notify(text) {

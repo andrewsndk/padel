@@ -57,7 +57,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GROUP_URL: https://racket.id/groups/4Y4qCwClTWQPAM
           POLL_INTERVAL_MS: '1000'
-          RELOAD_INTERVAL_MS: '15000'
+          RELOAD_INTERVAL_MS: '5000'
           MAX_RUNTIME_MS: '11700000'
           HEADLESS: 'true'
         run: node snipe.mjs
