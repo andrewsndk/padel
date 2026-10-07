@@ -22,7 +22,7 @@ GitHub предупреждает, что запланированные зап�
    В открывшемся окне войдите в racket.id. Когда страница группы загрузится, вернитесь в терминал и нажмите Enter.
 2. Загрузите сохранённую сессию в секрет репозитория `STORAGE_STATE_B64`:
    ```bash
-   base64 < storageState.json | tr -d '\\n'
+   base64 < storageState.json | tr -d '\n'
    ```
    Скопируйте вывод в **Settings → Secrets and variables → Actions → New repository secret**. Не публикуйте его в коде, issue или чате: это активная сессия аккаунта.
 3. По желанию добавьте `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHAT_ID` для уведомлений.
